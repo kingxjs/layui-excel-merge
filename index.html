@@ -1,0 +1,591 @@
+﻿<!DOCTYPE html>
+<html style="height: 100%">
+
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    <meta name="viewport" content="width=device-width, initial-scale=1,minmum-scale=1,maxmum-scale=1,user-scalable=no">
+    <title>复杂表头导出</title>
+    <link rel="stylesheet" href="/lib/layui/css/layui.css?v=20191028" />
+    <script src="/lib/jquery-3.1.1.min.js"></script>
+    <script src="/lib/layui/layui.js?v=20191028"></script>
+    <script src="/lib/jslinq/linq.min.js?v=20191028"></script>
+    <link rel="stylesheet" href="/lib/layui/css/layui.css?v=20191028" />
+    <style>
+        body {
+            margin: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div>
+
+        <blockquote class="layui-elem-quote">
+            基于layui-table和扩展组件excel，根据前端数据和显示列进行复杂表头导出<br>
+            excel组件，需要手动计算合并单元格坐标，[['A1', 'E1'],['A2', 'D4']]<br>
+            demo演示的是根据layui-table的colspan和rowspan计算<br>
+        </blockquote>
+        <div class="layui-row">
+            <div class="layui-col-xs8 layui-col-sm8 layui-col-md6">
+                <table id="layui-table" class="layui-table" lay-filter="userTable">
+                    <thead>
+                        <tr></tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+                <pre class="layui-code" lay-skin="notepad" lay-height="400px">
+layui.use(['table', 'excel', 'code'], function () {
+    var table = layui.table
+        , excel = layui.excel;
+    var $ = layui.$;
+    layui.code();
+    var cols1 = [
+        { field: 'id', title: 'ID', align: 'center', rowspan: 3 },
+        { field: 'userinfo', title: '用户信息', align: 'center', colspan: 5 },
+    ]
+    var cols2 = [
+        { field: 'jcinfo', title: '基础信息', align: 'center', colspan: 3 },
+        { field: 'kzdata', title: '扩展数据', align: 'center', colspan: 2 },
+    ]
+    var cols3 = [
+        { field: 'username', title: '用户名', align: 'center' },
+        { field: 'age', title: '年龄', align: 'center' },
+        { field: 'sex', title: '性别', align: 'center' },
+        { field: 'score', title: '积分', align: 'center' },
+        { field: 'classify', title: '职业', align: 'center' },
+    ]
+    var tCols = [cols1, cols2, cols3];
+    var myTable = table.render({
+        elem: '#layui-table'
+        , url: './data.json'
+        , cols: tCols
+        , id: 'userTable'
+        , toolbar: '#toolbarDemo' //操作1:启用自定义模板表格头部工具栏
+        , page: false
+        , done: function (res, curr, count) {
+            //soulTable.render(this)
+        }
+    });
+    //监听头工具栏事件
+    table.on('toolbar(userTable)', function (obj) {
+        var checkStatus = table.checkStatus(obj.config.id),
+            data = checkStatus.data; //获取选中的数据
+        switch (obj.event) {
+            case 'table_export':
+                active.table_export('userTable')
+                break;
+        };
+    });
+
+    var active = {
+        table_export: function (tableid) {
+
+            var data = table.cache[tableid];
+            var cols = myTable.config.cols;
+
+            var export_data = [];
+
+            var mergeobj = excelMerge.makeMergeCols(cols);
+            var mCols3 = mergeobj.colobj;
+            var mMerge = mergeobj.merge;
+            //表头
+            for (var i = 0; i < cols.length; i++) {
+                var mColsItem = jQuery.extend({}, mCols3);
+                for (var x in mColsItem) {
+                    mColsItem[x] = '';
+                }
+                for (var j = 0; j < cols[i].length; j++) {
+                    var col = cols[i][j];
+                    if (col.field) {
+                        mColsItem[col.field] = col.title;
+                    }
+                    if (col.type === 'numbers') {
+                        mColsItem[col.type] = col.title;
+                    }
+                }
+                export_data.push(mColsItem)
+            }
+
+            //数据填充
+            for (var i = 0; i < data.length; i++) {
+                var obj4 = jQuery.extend({}, mCols3);
+                for (var x in obj4) {
+                    obj4[x] = '';
+                }
+                if ('numbers' in obj4) {
+                    obj4['numbers'] = (i + 1);
+                }
+
+                for (var x in data[i]) {
+                    if (x in obj4) {
+                        var val = data[i][x];
+                        obj4[x] = val;
+                    }
+                }
+                export_data.push(obj4);
+            }
+
+
+            var mergeConf = excel.makeMergeConfig(mMerge);
+            excel.exportExcel({
+                sheet1: export_data
+            }, '测试复杂表头导出.xlsx', 'xlsx', {
+                    extend: {
+                        // extend 中可以指定某个 sheet 的属性，如果不指定 sheet 则所有 sheet 套用同一套属性
+                        sheet1: {
+                            '!merges': mergeConf,
+
+                        }
+                    }
+                });
+        },
+    };
+
+    var excelMerge = {
+        /**
+            * layui cols 转换为一级
+            * @param {any} cols
+            * @param {any} key
+            */
+        makeMergeColChild: function (cols, key) {
+            var THIS = excelMerge;
+            var mcols = [];
+            if (key) {
+                mcols = Enumerable.From(cols).Where(function (d) {
+                    return d.parentKey == key;
+                }).ToArray();
+            } else {
+                mcols = Enumerable.From(cols).Where(function (d) {
+                    return !d.parentKey;
+                }).ToArray();
+            }
+            var mcols_2 = [];
+            for (var i = 0; i < mcols.length; i++) {
+                var mcol = mcols[i];
+                var mcols_2_item = THIS.makeMergeColChild(cols, mcol.key);
+                if (mcols_2_item.length > 0) {
+                    mcol.field = mcols_2_item[0].field;
+                }
+                mcols_2.push(mcol)
+                mcols_2 = mcols_2.concat(mcols_2_item);
+            }
+            return mcols_2;
+        },
+        /**
+            * 根据layui-table的列，合并单元格快速生成配置的函数 传入 [ ['开始坐标 A1', '结束坐标 D2'], ['开始坐标 B2', '结束坐标 E3'] ]
+            * @param  {[type]} cols   [description] layui cols参数
+            * @return {[type]} merge  [description] 合并单元格集合
+            * @return {[type]} cols   [description] 列信息集合
+            * @return {[type]} colobj [description] 列信息对象
+            */
+        makeMergeCols: function (cols) {
+            var mCols = [];
+            var mMerge = [];
+            var mMap = {
+                rmap: { start: 1, end: 1 },
+                cmap: { start: 1, end: 1 }
+            };
+            for (var i = 0; i < cols.length; i++) {
+                for (var j = 0; j < cols[i].length; j++) {
+                    var col = cols[i][j];
+                    var map = col.key.split('-')
+                    var ri = parseInt(map[0]);
+                    var ci = parseInt(map[1]);
+                    ri = ri == 0 ? 1 : ri; //行坐标 从 1 开始
+                    ci = ci == 0 ? 1 : ci; //列坐标 从 1 开始
+                    var ri1 = parseInt(map[0]); //记录初始行坐标
+                    var ci1 = parseInt(map[1]); //记录初始列坐标
+                    col.rowspan = parseInt(col.rowspan) || 1;   //跨行默认1行
+                    col.colspan = parseInt(col.colspan) || 1;   //跨列默认1列
+                    if (col.parentKey) {
+                        var pcol = Enumerable.From(mCols).Where(function (d) {
+                            return d.key == col.parentKey;
+                        }).FirstOrDefault();
+                        if (pcol) { //上一行字段
+                            if (ri1 <= pcol.merge.rmap.end) { //对比父级最后一行的行号
+                                ri = pcol.merge.rmap.end + 1; //本身的行号应比父级大1
+                            }
+
+                            if (ci1 + 1 < pcol.merge.cmap.start) { //对比父级最后一列的列号
+                                ci = pcol.merge.cmap.start;     // 本身的列号应等于父级
+                            }
+                        }
+                    }
+                    if (ci > 0) {
+                        var qcol = Enumerable.From(mCols).Where(function (d) {
+                            return d.key == (ri1 + "-" + (ci1 - 1));
+                        }).FirstOrDefault();
+                        if (qcol) { //前一列
+                            if (ci1 <= qcol.merge.cmap.end) { //本身的列号不大于前一列的列号
+                                ci = qcol.merge.cmap.end + 1; //则表示被盖住，应往后挪一列
+                            }
+                        }
+                    }
+                    var rmap = {
+                        start: ri
+                    }
+                    var cmap = {
+                        start: ci
+                    }
+                    //计算跨行跨列，得到结束行列
+                    ri += col.rowspan - 1;
+                    ci += col.colspan - 1;
+                    rmap.end = ri;
+                    cmap.end = ci;
+
+                    var merge = { rmap: rmap, cmap: cmap };
+
+                    col.merge = merge;
+                    var map1 = getZimu(cmap.start, rmap.start);
+                    var map2 = getZimu(cmap.end, rmap.end);
+                    col.map = [map1, map2];
+                    //没有跨行跨列的不放入合并单元格数组
+                    if (rmap.start != rmap.end || cmap.start != cmap.end) {
+                        mMerge.push([map1, map2]);
+                    }
+                    //计算表头的初始坐标和结束坐标
+                    if (mMap.rmap.end < rmap.end) {
+                        mMap.rmap.end = rmap.end;
+                    }
+
+                    if (mMap.cmap.end < cmap.end) {
+                        mMap.cmap.end = cmap.end;
+                    }
+
+
+                    mCols.push(col);
+                }
+            }
+            function getZimu(col, row) {
+                var zimu = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z'];
+                var num1 = parseInt(col / 26);//计算有几个字母
+                var num2 = col % 26;
+                var num3 = '';
+                //计算列号字母
+                if (num1 > 0) {
+                    num3 += zimu[num1 - 1];
+                }
+                //字母（列）+数字（行号）
+                num3 += zimu[num2 > 0 ? num2 - 1 : num2] + (row == 0 ? 1 : row);
+                return num3;
+            }
+
+            var map3 = getZimu(mMap.cmap.start, mMap.rmap.start);
+            var map4 = getZimu(mMap.cmap.end, mMap.rmap.end);
+            mMap.map = [map3, map4];
+
+            //因为excel组件，需要把所有列放到一个对象中，所以需要把各级表头放到一级
+            mCols = excelMerge.makeMergeColChild(mCols);
+            var ColObj = {};
+            for (var i = 0; i < mCols.length; i++) {
+                var col = mCols[i];
+                if (col.field) {
+                    ColObj[col.field] = col.title;
+                }
+                //序号列，特殊处理
+                if (col.type === 'numbers') {
+                    ColObj['numbers'] = col.title;
+                }
+            }
+            var obj = {
+                merge: mMerge,
+                cols: mCols,
+                colobj: ColObj,
+                map: mMap
+            };
+            return obj;
+        },
+    }
+    $('.demoTable .layui-btn').on('click', function () {
+        var type = $(this).data('type');
+        active[type] ? active[type].call(this) : '';
+    });
+});
+                </pre>
+            </div>
+
+        </div>
+    </div>
+    <script type="text/html" id="toolbarDemo">
+        <div class="layui-row">
+            <div class="layui-col-md2 layui-col-sm3 layui-col-xs6" style="text-align: left;padding-left: 10px;">
+                <div class="layui-input-inline">
+                    <span class="layui-btn layui-btn-sm " lay-event="table_export">导出</span>
+                </div>
+            </div>
+        </div>
+    </script>
+    <script>
+        layui.config({
+            base: '/lib/layui/modules/'
+        })
+        layui.use(['table', 'excel', 'code'], function () {
+            var table = layui.table
+                , excel = layui.excel;
+            var $ = layui.$;
+            layui.code();
+            var cols1 = [
+                { field: 'id', title: 'ID', align: 'center', rowspan: 3 },
+                { field: 'userinfo', title: '用户信息', align: 'center', colspan: 5 },
+            ]
+            var cols2 = [
+                { field: 'jcinfo', title: '基础信息', align: 'center', colspan: 3 },
+                { field: 'kzdata', title: '扩展数据', align: 'center', colspan: 2 },
+            ]
+            var cols3 = [
+                { field: 'username', title: '用户名', align: 'center' },
+                { field: 'age', title: '年龄', align: 'center' },
+                { field: 'sex', title: '性别', align: 'center' },
+                { field: 'score', title: '积分', align: 'center' },
+                { field: 'classify', title: '职业', align: 'center' },
+            ]
+            var tCols = [cols1, cols2, cols3];
+            var myTable = table.render({
+                elem: '#layui-table'
+                , url: './data.json'
+                , cols: tCols
+                , id: 'userTable'
+                , toolbar: '#toolbarDemo' //操作1:启用自定义模板表格头部工具栏
+                , page: false
+                , done: function (res, curr, count) {
+                    //soulTable.render(this)
+                }
+            });
+            //监听头工具栏事件
+            table.on('toolbar(userTable)', function (obj) {
+                var checkStatus = table.checkStatus(obj.config.id),
+                    data = checkStatus.data; //获取选中的数据
+                switch (obj.event) {
+                    case 'table_export':
+                        active.table_export('userTable')
+                        break;
+                };
+            });
+
+            var active = {
+                table_export: function (tableid) {
+
+                    var data = table.cache[tableid];
+                    var cols = myTable.config.cols;
+
+                    var export_data = [];
+
+                    var mergeobj = excelMerge.makeMergeCols(cols);
+                    var mCols3 = mergeobj.colobj;
+                    var mMerge = mergeobj.merge;
+                    //表头
+                    for (var i = 0; i < cols.length; i++) {
+                        var mColsItem = jQuery.extend({}, mCols3);
+                        for (var x in mColsItem) {
+                            mColsItem[x] = '';
+                        }
+                        for (var j = 0; j < cols[i].length; j++) {
+                            var col = cols[i][j];
+                            if (col.field) {
+                                mColsItem[col.field] = col.title;
+                            }
+                            if (col.type === 'numbers') {
+                                mColsItem[col.type] = col.title;
+                            }
+                        }
+                        export_data.push(mColsItem)
+                    }
+
+                    //数据填充
+                    for (var i = 0; i < data.length; i++) {
+                        var obj4 = jQuery.extend({}, mCols3);
+                        for (var x in obj4) {
+                            obj4[x] = '';
+                        }
+                        if ('numbers' in obj4) {
+                            obj4['numbers'] = (i + 1);
+                        }
+
+                        for (var x in data[i]) {
+                            if (x in obj4) {
+                                var val = data[i][x];
+                                obj4[x] = val;
+                            }
+                        }
+                        export_data.push(obj4);
+                    }
+
+
+                    var mergeConf = excel.makeMergeConfig(mMerge);
+                    excel.exportExcel({
+                        sheet1: export_data
+                    }, '测试复杂表头导出.xlsx', 'xlsx', {
+                            extend: {
+                                // extend 中可以指定某个 sheet 的属性，如果不指定 sheet 则所有 sheet 套用同一套属性
+                                sheet1: {
+                                    '!merges': mergeConf,
+
+                                }
+                            }
+                        });
+                },
+            };
+            var excelMerge = {
+                /**
+                * layui cols 转换为一级
+                * @param {any} cols
+                * @param {any} key
+                */
+                makeMergeColChild: function (cols, key) {
+                    var THIS = excelMerge;
+                    var mcols = [];
+                    if (key) {
+                        mcols = Enumerable.From(cols).Where(function (d) {
+                            return d.parentKey == key;
+                        }).ToArray();
+                    } else {
+                        mcols = Enumerable.From(cols).Where(function (d) {
+                            return !d.parentKey;
+                        }).ToArray();
+                    }
+                    var mcols_2 = [];
+                    for (var i = 0; i < mcols.length; i++) {
+                        var mcol = mcols[i];
+                        var mcols_2_item = THIS.makeMergeColChild(cols, mcol.key);
+                        if (mcols_2_item.length > 0) {
+                            mcol.field = mcols_2_item[0].field;
+                        }
+                        mcols_2.push(mcol)
+                        mcols_2 = mcols_2.concat(mcols_2_item);
+                    }
+                    return mcols_2;
+                },
+                /**
+                 * 根据layui-table的列，合并单元格快速生成配置的函数 传入 [ ['开始坐标 A1', '结束坐标 D2'], ['开始坐标 B2', '结束坐标 E3'] ]
+                 * @param  {[type]} cols   [description] layui cols参数
+                 * @return {[type]} merge  [description] 合并单元格集合
+                 * @return {[type]} cols   [description] 列信息集合
+                 * @return {[type]} colobj [description] 列信息对象
+                 */
+                makeMergeCols: function (cols) {
+                    var mCols = [];
+                    var mMerge = [];
+                    var mMap = {
+                        rmap: { start: 1, end: 1 },
+                        cmap: { start: 1, end: 1 }
+                    };
+                    for (var i = 0; i < cols.length; i++) {
+                        for (var j = 0; j < cols[i].length; j++) {
+                            var col = cols[i][j];
+                            var map = col.key.split('-')
+                            var ri = parseInt(map[0]);
+                            var ci = parseInt(map[1]);
+                            ri = ri == 0 ? 1 : ri; //行坐标 从 1 开始
+                            ci = ci == 0 ? 1 : ci; //列坐标 从 1 开始
+                            var ri1 = parseInt(map[0]); //记录初始行坐标
+                            var ci1 = parseInt(map[1]); //记录初始列坐标
+                            col.rowspan = parseInt(col.rowspan) || 1;   //跨行默认1行
+                            col.colspan = parseInt(col.colspan) || 1;   //跨列默认1列
+                            if (col.parentKey) {
+                                var pcol = Enumerable.From(mCols).Where(function (d) {
+                                    return d.key == col.parentKey;
+                                }).FirstOrDefault();
+                                if (pcol) { //上一行字段
+                                    if (ri1 <= pcol.merge.rmap.end) { //对比父级最后一行的行号
+                                        ri = pcol.merge.rmap.end + 1; //本身的行号应比父级大1
+                                    }
+
+                                    if (ci1 + 1 < pcol.merge.cmap.start) { //对比父级最后一列的列号
+                                        ci = pcol.merge.cmap.start;     // 本身的列号应等于父级
+                                    }
+                                }
+                            }
+                            if (ci > 0) {
+                                var qcol = Enumerable.From(mCols).Where(function (d) {
+                                    return d.key == (ri1 + "-" + (ci1 - 1));
+                                }).FirstOrDefault();
+                                if (qcol) { //前一列
+                                    if (ci1 <= qcol.merge.cmap.end) { //本身的列号不大于前一列的列号
+                                        ci = qcol.merge.cmap.end + 1; //则表示被盖住，应往后挪一列
+                                    }
+                                }
+                            }
+                            var rmap = {
+                                start: ri
+                            }
+                            var cmap = {
+                                start: ci
+                            }
+                            //计算跨行跨列，得到结束行列
+                            ri += col.rowspan - 1;
+                            ci += col.colspan - 1;
+                            rmap.end = ri;
+                            cmap.end = ci;
+
+                            var merge = { rmap: rmap, cmap: cmap };
+
+                            col.merge = merge;
+                            var map1 = getZimu(cmap.start, rmap.start);
+                            var map2 = getZimu(cmap.end, rmap.end);
+                            col.map = [map1, map2];
+                            //没有跨行跨列的不放入合并单元格数组
+                            if (rmap.start != rmap.end || cmap.start != cmap.end) {
+                                mMerge.push([map1, map2]);
+                            }
+                            //计算表头的初始坐标和结束坐标
+                            if (mMap.rmap.end < rmap.end) {
+                                mMap.rmap.end = rmap.end;
+                            }
+
+                            if (mMap.cmap.end < cmap.end) {
+                                mMap.cmap.end = cmap.end;
+                            }
+
+
+                            mCols.push(col);
+                        }
+                    }
+                    function getZimu(col, row) {
+                        var zimu = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z'];
+                        var num1 = parseInt(col / 26);//计算有几个字母
+                        var num2 = col % 26;
+                        var num3 = '';
+                        //计算列号字母
+                        if (num1 > 0) {
+                            num3 += zimu[num1 - 1];
+                        }
+                        //字母（列）+数字（行号）
+                        num3 += zimu[num2 > 0 ? num2 - 1 : num2] + (row == 0 ? 1 : row);
+                        return num3;
+                    }
+
+                    var map3 = getZimu(mMap.cmap.start, mMap.rmap.start);
+                    var map4 = getZimu(mMap.cmap.end, mMap.rmap.end);
+                    mMap.map = [map3, map4];
+
+                    //因为excel组件，需要把所有列放到一个对象中，所以需要把各级表头放到一级
+                    mCols = excelMerge.makeMergeColChild(mCols);
+                    var ColObj = {};
+                    for (var i = 0; i < mCols.length; i++) {
+                        var col = mCols[i];
+                        if (col.field) {
+                            ColObj[col.field] = col.title;
+                        }
+                        //序号列，特殊处理
+                        if (col.type === 'numbers') {
+                            ColObj['numbers'] = col.title;
+                        }
+                    }
+                    var obj = {
+                        merge: mMerge,
+                        cols: mCols,
+                        colobj: ColObj,
+                        map: mMap
+                    };
+                    return obj;
+                }
+            }
+            $('.demoTable .layui-btn').on('click', function () {
+                var type = $(this).data('type');
+                active[type] ? active[type].call(this) : '';
+            });
+        });
+    </script>
+</body>
+</html>
+
