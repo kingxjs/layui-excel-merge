@@ -91,16 +91,15 @@
                     data = checkStatus.data; //获取选中的数据
                 switch (obj.event) {
                     case 'table_export':
-                        active.table_export('userTable')
+                        active.table_export(myTable)
                         break;
                 };
             });
 
             var active = {
-                table_export: function (tableid) {
-
-                    var data = table.cache[tableid];
-                    var cols = myTable.config.cols;
+                table_export: function (tableElem, data) {
+                    data = data || table.cache[tableElem.config.id];
+                    var cols = tableElem.config.cols;
                     var mergeobj = excelMerge.makeMergeColsData(cols, data);
                     var mMerge = mergeobj.merge;
                     var mergeConf = excel.makeMergeConfig(mMerge);
@@ -110,8 +109,7 @@
                             extend: {
                                 // extend 中可以指定某个 sheet 的属性，如果不指定 sheet 则所有 sheet 套用同一套属性
                                 sheet1: {
-                                    '!merges': mergeConf,
-
+                                    '!merges': mergeConf
                                 }
                             }
                         });
@@ -335,5 +333,6 @@
         });
     </script>
 </body>
+
 </html>
 
