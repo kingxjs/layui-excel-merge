@@ -77,58 +77,16 @@ layui.use(['table', 'excel', 'code'], function () {
         };
     });
 
-    var active = {
+     var active = {
         table_export: function (tableid) {
 
             var data = table.cache[tableid];
             var cols = myTable.config.cols;
-
-            var export_data = [];
-
-            var mergeobj = excelMerge.makeMergeCols(cols);
-            var mCols3 = mergeobj.colobj;
+            var mergeobj = excelMerge.makeMergeColsData(cols, data);
             var mMerge = mergeobj.merge;
-            //表头
-            for (var i = 0; i < cols.length; i++) {
-                var mColsItem = jQuery.extend({}, mCols3);
-                for (var x in mColsItem) {
-                    mColsItem[x] = '';
-                }
-                for (var j = 0; j < cols[i].length; j++) {
-                    var col = cols[i][j];
-                    if (col.field) {
-                        mColsItem[col.field] = col.title;
-                    }
-                    if (col.type === 'numbers') {
-                        mColsItem[col.type] = col.title;
-                    }
-                }
-                export_data.push(mColsItem)
-            }
-
-            //数据填充
-            for (var i = 0; i < data.length; i++) {
-                var obj4 = jQuery.extend({}, mCols3);
-                for (var x in obj4) {
-                    obj4[x] = '';
-                }
-                if ('numbers' in obj4) {
-                    obj4['numbers'] = (i + 1);
-                }
-
-                for (var x in data[i]) {
-                    if (x in obj4) {
-                        var val = data[i][x];
-                        obj4[x] = val;
-                    }
-                }
-                export_data.push(obj4);
-            }
-
-
             var mergeConf = excel.makeMergeConfig(mMerge);
             excel.exportExcel({
-                sheet1: export_data
+                sheet1: mergeobj.data
             }, '测试复杂表头导出.xlsx', 'xlsx', {
                     extend: {
                         // extend 中可以指定某个 sheet 的属性，如果不指定 sheet 则所有 sheet 套用同一套属性
@@ -140,13 +98,23 @@ layui.use(['table', 'excel', 'code'], function () {
                 });
         },
     };
-
     var excelMerge = {
         /**
-            * layui cols 转换为一级
-            * @param {any} cols
-            * @param {any} key
+            * 计算单元格坐标并填充数据
+            * @param cols
+            * @param data
             */
+        makeMergeColsData: function (cols, data) {
+            var mergeobj = excelMerge.makeMergeCols(cols);
+            var mCols = mergeobj.colobj;
+            mergeobj.data = excelMerge.makeMergeData(cols, mCols, data);
+            return mergeobj;
+        },
+        /**
+        * layui cols 转换为一级
+        * @param {any} cols
+        * @param {any} key
+        */
         makeMergeColChild: function (cols, key) {
             var THIS = excelMerge;
             var mcols = [];
@@ -295,6 +263,51 @@ layui.use(['table', 'excel', 'code'], function () {
             };
             return obj;
         },
+        /**
+            * 填充数据
+            * @param cols
+            * @param data
+            */
+        makeMergeData: function (cols, mcols, data) {
+            var export_data = [];
+            //表头
+            for (var i = 0; i < cols.length; i++) {
+                var mColsItem = jQuery.extend({}, mcols);
+                for (var x in mColsItem) {
+                    mColsItem[x] = '';
+                }
+                for (var j = 0; j < cols[i].length; j++) {
+                    var col = cols[i][j];
+                    if (col.field) {
+                        mColsItem[col.field] = col.title;
+                    }
+                    if (col.type === 'numbers') {
+                        mColsItem[col.type] = col.title;
+                    }
+                }
+                export_data.push(mColsItem)
+            }
+
+            //数据填充
+            for (var i = 0; i < data.length; i++) {
+                var obj4 = jQuery.extend({}, mcols);
+                for (var x in obj4) {
+                    obj4[x] = '';
+                }
+                if ('numbers' in obj4) {
+                    obj4['numbers'] = (i + 1);
+                }
+
+                for (var x in data[i]) {
+                    if (x in obj4) {
+                        var val = data[i][x];
+                        obj4[x] = val;
+                    }
+                }
+                export_data.push(obj4);
+            }
+            return export_data;
+        }
     }
     $('.demoTable .layui-btn').on('click', function () {
         var type = $(this).data('type');
@@ -367,53 +380,11 @@ layui.use(['table', 'excel', 'code'], function () {
 
                     var data = table.cache[tableid];
                     var cols = myTable.config.cols;
-
-                    var export_data = [];
-
-                    var mergeobj = excelMerge.makeMergeCols(cols);
-                    var mCols3 = mergeobj.colobj;
+                    var mergeobj = excelMerge.makeMergeColsData(cols, data);
                     var mMerge = mergeobj.merge;
-                    //表头
-                    for (var i = 0; i < cols.length; i++) {
-                        var mColsItem = jQuery.extend({}, mCols3);
-                        for (var x in mColsItem) {
-                            mColsItem[x] = '';
-                        }
-                        for (var j = 0; j < cols[i].length; j++) {
-                            var col = cols[i][j];
-                            if (col.field) {
-                                mColsItem[col.field] = col.title;
-                            }
-                            if (col.type === 'numbers') {
-                                mColsItem[col.type] = col.title;
-                            }
-                        }
-                        export_data.push(mColsItem)
-                    }
-
-                    //数据填充
-                    for (var i = 0; i < data.length; i++) {
-                        var obj4 = jQuery.extend({}, mCols3);
-                        for (var x in obj4) {
-                            obj4[x] = '';
-                        }
-                        if ('numbers' in obj4) {
-                            obj4['numbers'] = (i + 1);
-                        }
-
-                        for (var x in data[i]) {
-                            if (x in obj4) {
-                                var val = data[i][x];
-                                obj4[x] = val;
-                            }
-                        }
-                        export_data.push(obj4);
-                    }
-
-
                     var mergeConf = excel.makeMergeConfig(mMerge);
                     excel.exportExcel({
-                        sheet1: export_data
+                        sheet1: mergeobj.data
                     }, '测试复杂表头导出.xlsx', 'xlsx', {
                             extend: {
                                 // extend 中可以指定某个 sheet 的属性，如果不指定 sheet 则所有 sheet 套用同一套属性
@@ -426,6 +397,17 @@ layui.use(['table', 'excel', 'code'], function () {
                 },
             };
             var excelMerge = {
+                /**
+                 * 计算单元格坐标并填充数据
+                 * @param cols
+                 * @param data
+                 */
+                makeMergeColsData: function (cols, data) {
+                    var mergeobj = excelMerge.makeMergeCols(cols);
+                    var mCols = mergeobj.colobj;
+                    mergeobj.data = excelMerge.makeMergeData(cols, mCols, data);
+                    return mergeobj;
+                },
                 /**
                 * layui cols 转换为一级
                 * @param {any} cols
@@ -578,6 +560,51 @@ layui.use(['table', 'excel', 'code'], function () {
                         map: mMap
                     };
                     return obj;
+                },
+                /**
+                 * 填充数据
+                 * @param cols
+                 * @param data
+                 */
+                makeMergeData: function (cols, mcols, data) {
+                    var export_data = [];
+                    //表头
+                    for (var i = 0; i < cols.length; i++) {
+                        var mColsItem = jQuery.extend({}, mcols);
+                        for (var x in mColsItem) {
+                            mColsItem[x] = '';
+                        }
+                        for (var j = 0; j < cols[i].length; j++) {
+                            var col = cols[i][j];
+                            if (col.field) {
+                                mColsItem[col.field] = col.title;
+                            }
+                            if (col.type === 'numbers') {
+                                mColsItem[col.type] = col.title;
+                            }
+                        }
+                        export_data.push(mColsItem)
+                    }
+
+                    //数据填充
+                    for (var i = 0; i < data.length; i++) {
+                        var obj4 = jQuery.extend({}, mcols);
+                        for (var x in obj4) {
+                            obj4[x] = '';
+                        }
+                        if ('numbers' in obj4) {
+                            obj4['numbers'] = (i + 1);
+                        }
+
+                        for (var x in data[i]) {
+                            if (x in obj4) {
+                                var val = data[i][x];
+                                obj4[x] = val;
+                            }
+                        }
+                        export_data.push(obj4);
+                    }
+                    return export_data;
                 }
             }
             $('.demoTable .layui-btn').on('click', function () {
