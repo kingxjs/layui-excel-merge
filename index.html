@@ -59,10 +59,11 @@
             $(".layui-code").html($("#layui-code").html())
             layui.code();
             var cols1 = [
-                { field: 'id', title: 'ID', align: 'center', rowspan: 3 },
+                { field: 'id', title: '标志位', align: 'center' },
                 { field: 'userinfo', title: '用户信息', align: 'center', colspan: 5 },
             ]
             var cols2 = [
+                { field: 'id', title: 'ID', align: 'center', rowspan: 2 },
                 { field: 'jcinfo', title: '基础信息', align: 'center', colspan: 3 },
                 { field: 'kzdata', title: '扩展数据', align: 'center', colspan: 2 },
             ]
@@ -246,6 +247,10 @@
                         var num1 = parseInt(col / 26);//计算有几个字母
                         var num2 = col % 26;
                         var num3 = '';
+                        if (num2 == 0) {
+                            num1 -= 1;
+                            num2 = 26;
+                        }
                         //计算列号字母
                         if (num1 > 0) {
                             num3 += zimu[num1 - 1];
